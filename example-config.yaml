@@ -1,0 +1,105 @@
+telegram:
+  api_token: 1234567890:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  # http_timeout_seconds: 5 (default)
+  # output_buffer_size: 100 (default)
+  # updates_buffer_size: 100 (default)
+  polling: {}
+    # duration_seconds: 60 (default)
+    # http_timeout_seconds: 65 (default)
+  # webhook: (conflicts with "polling")
+  #  path: /secret/webhook/
+  #  secret_token: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  #  bind_addr: 0.0.0.0:8000 (default)
+  #  accept_timeout_seconds: 5 (default)
+  #  metrics_path: /secret/metrics/ (optional, conflicts with "metrics_server")
+flo: {}
+  # http_timeout: 5 (default)
+  # api_origin: http://127.0.0.1:6000 (optional, uses prod API by default)
+  # user_agent: Chrome (optional, no UA header by default)
+  # poll_interval_seconds:
+  #   min: 40
+  #   max: 100
+  # input_buffer_size: 100 (default)
+  # output_buffer_size: 100 (default)
+metrics_server:
+  # bind_addr: 0.0.0.0:9090 (default)
+  path: /secret/metrics/
+locations:
+- id: blue_mountain
+  name: Blue Mountain Park
+  parks:
+  - id: 25c15eb8-7d90-4732-b081-19d5372891ab
+    stations:
+    - id: 4b4c3327-5684-4034-baa6-15b9c6bbed4e
+      alias: "1"
+    - id: d12a0a19-73e8-4ae2-8bfb-84ab0cc27dc1
+      alias: "2"
+    - id: 5f26a876-1160-4dfe-a5b7-ad087ae1e9f6
+      alias: "3"
+    - id: c8b05576-4a0c-4dbd-8603-ebab544570c4
+      alias: "4"
+- id: ikea_coquitlam
+  name: IKEA Coquitlam
+  parks:
+  # IKEA COQUITLAM 1
+  - id: 3de383f3-1040-c1b8-74de-8290991c1052
+    stations:
+    - id: a0cd0b2e-050b-4d07-2105-08db897648da
+      alias: "1"
+    - id: a5661314-d462-426f-2106-08db897648da
+      alias: "2"
+  # IKEA COQUITLAM 2
+  - id: ad8c095d-0098-c885-34e4-4c73e54b81c7
+    stations:
+    - id: cc1e6ce5-d21d-4957-b31c-08db8aa80d2a
+      alias: "3"
+    - id: 396e6da9-0217-4792-b31d-08db8aa80d2a
+      alias: "4"
+- id: lafarge_lake
+  name: Lafarge Lake
+  parks:
+  - id: c14941a6-5d02-4a2f-95aa-fa5e00d08e85
+    stations:
+    - id: 0e651fee-88f1-40c5-a811-3eb68966a4ca
+      alias: "1"
+    - id: 88168c17-e2ee-44f3-ba78-8c51f15d197f
+      alias: "2"
+    - id: 1743a19c-c5fa-4f1b-b682-4b8dcb86c5b3
+      alias: "3"
+    - id: 51ba5a7d-a7d4-4a40-83e0-ce5a242504f1
+      alias: "4"
+- id: poirier_public_library
+  name: Poirier Public Library
+  parks:
+  - id: 316738d7-999b-4ccb-a14f-101fdd064017
+    stations:
+    - id: 3655a5d4-d793-4b47-9b0d-0c8860be1787
+      alias: "1"
+    - id: b1b50400-7b52-4503-a4b9-8a94a710ba8a
+      alias: "2"
+    - id: 73666d91-ba47-4a05-8a6c-d5e399d62b0c
+      alias: "3"
+- id: rocky_point
+  name: Rocky Point Park
+  parks:
+  - id: 570990e8-54a3-ec1f-bfdb-e3070233a31d
+    stations:
+    - id: 81245c05-8ea7-46fb-23c0-08db897648da
+      alias: "1"
+    - id: 8cc34a13-3daa-433c-23c1-08db897648da
+      alias: "2"
+chats:
+- id: 12345678  # private chat
+  locations:
+  - blue_mountain
+  - ikea_coquitlam
+  - lafarge_lake
+  - poirier_public_library
+  - rocky_point
+- id: -87654321  # group chat
+  locations:
+  - blue_mountain
+  - ikea_coquitlam
+  - lafarge_lake
+  - poirier_public_library
+  - rocky_point

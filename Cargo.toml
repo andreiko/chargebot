@@ -1,0 +1,23 @@
+[package]
+name = "chargebot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0"
+backoff = "0"
+clap = "3"
+env_logger = "0"
+lazy_static = "1"
+log = "0"
+prometheus-client = "0"
+rand = "0"
+reqwest = { version = "0", features = ["json", "serde_json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "3"
+serde_yaml = "0"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync"] }
+url = "2"
+validator = { version = "0.16", features = ["derive"] }
+warp = "0.3"
