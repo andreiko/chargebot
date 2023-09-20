@@ -17,8 +17,8 @@ flo: {}
   # api_origin: http://127.0.0.1:6000 (optional, uses prod API by default)
   # user_agent: Chrome (optional, no UA header by default)
   # poll_interval_seconds:
-  #   min: 40
-  #   max: 100
+  #   min: 40 (default)
+  #   max: 100 (default)
   # input_buffer_size: 100 (default)
   # output_buffer_size: 100 (default)
 metrics_server:
