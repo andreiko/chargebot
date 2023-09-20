@@ -4,7 +4,7 @@ This is a Telegram bot that can monitor your favourite EV charger stations and n
 
 ## Demo
 
-https://github.com/andreiko/chargebot/assets/340586/9ad2bc49-f1f2-4e83-b151-819e9e2a8be9
+https://github.com/andreiko/chargebot/assets/340586/7ecc0220-d892-4b7e-bf9a-6e9962f7524f
 
 ## Architecture
 
