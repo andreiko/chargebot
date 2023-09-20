@@ -21,8 +21,6 @@ pub mod metrics;
 pub mod telegram;
 pub mod utils;
 
-// TODO: add example config
-// TODO: automated push to dockerhub
 // TODO: helm chart
 
 #[tokio::main]
