@@ -1,7 +1,5 @@
-use std::cell::RefCell;
-
 use tokio::select;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 use crate::utils::retry::{exp_backoff_forever, retry};
 
@@ -23,7 +21,7 @@ pub struct Config {
 /// Poller will shut down when the `cancel` channel is closed or when it encounters an unrecoverable error.
 pub async fn start(client: impl Client, cfg: Config) {
     let mut next_offset = 0u64;
-    let cancel = RefCell::new(cfg.cancel);
+    let cancel = Mutex::new(cfg.cancel);
 
     loop {
         let updates_res = retry(
@@ -33,7 +31,7 @@ pub async fn start(client: impl Client, cfg: Config) {
                     offset: next_offset as i64,
                     timeout: cfg.duration_seconds,
                 });
-                let mut cancel = cancel.borrow_mut();
+                let cancel = &mut cancel.lock().await;
                 select! {
                     // propagate the result but wrap in Option
                     result = get_updates_fut => result.map(Some),
