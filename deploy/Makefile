@@ -1,4 +1,5 @@
 VERSION ?= $(error VERSION is required)
+PRIVATE_VERSION ?= $(VERSION)
 
 .PHONY: all
 all:
@@ -12,4 +13,4 @@ embed-config:
 
 .PHONY: deploy
 deploy:
-	fly deploy -i registry.fly.io/chargebot:$(VERSION)
+	fly deploy -i registry.fly.io/chargebot:$(PRIVATE_VERSION)
