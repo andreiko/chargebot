@@ -1,20 +1,20 @@
-use std::time::Duration;
+use std::{sync::LazyLock, time::Duration};
 
 use async_trait::async_trait;
-use lazy_static::lazy_static;
-use prometheus_client::metrics::family::Family;
-use prometheus_client::metrics::histogram::Histogram;
-use prometheus_client::registry::Registry;
+use prometheus_client::{
+    metrics::{family::Family, histogram::Histogram},
+    registry::Registry,
+};
 use serde::{Deserialize, Serialize};
 
 use super::models::{GetUpdates, Payload, Update};
-use crate::utils::error::Error;
-use crate::utils::metrics::{common_histogram_buckets, report_api_call_timing, APICallLabels};
+use crate::utils::{
+    error::Error,
+    metrics::{common_histogram_buckets, report_api_call_timing, APICallLabels},
+};
 
-lazy_static! {
-    static ref TELEGRAM_API_CALLS: Family::<APICallLabels, Histogram> =
-        Family::new_with_constructor(|| Histogram::new(common_histogram_buckets()));
-}
+static TELEGRAM_API_CALLS: LazyLock<Family<APICallLabels, Histogram>> =
+    LazyLock::new(|| Family::new_with_constructor(|| Histogram::new(common_histogram_buckets())));
 
 /// Registers prometheus metrics published by this module.
 pub fn register_metrics(reg: &mut Registry) {

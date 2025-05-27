@@ -1,22 +1,23 @@
-use std::time::Duration;
+use std::{sync::LazyLock, time::Duration};
 
 use async_trait::async_trait;
-use lazy_static::lazy_static;
-use prometheus_client::metrics::family::Family;
-use prometheus_client::metrics::histogram::Histogram;
-use prometheus_client::registry::Registry;
+use prometheus_client::{
+    metrics::{family::Family, histogram::Histogram},
+    registry::Registry,
+};
 use reqwest::header::USER_AGENT;
 
-use crate::utils::error::Error;
-use crate::utils::metrics::{common_histogram_buckets, report_api_call_timing, APICallLabels};
-
 use super::models::Park;
+use crate::utils::{
+    error::Error,
+    metrics::{common_histogram_buckets, report_api_call_timing, APICallLabels},
+};
 
 /// FLO API client interface.
 #[async_trait]
 pub trait Client {
     /// Fetches a Park object using its ID.
-    async fn get_park(&self, park_id: impl AsRef<str> + Send) -> Result<Park, Error>;
+    async fn get_park(&self, park_id: &str) -> Result<Park, Error>;
 }
 
 /// Implements `Client` by making HTTP requests to the API.
@@ -28,10 +29,8 @@ pub struct HTTPClient {
 
 const DEFAULT_API_ORIGIN: &str = "https://emobility.flo.ca";
 
-lazy_static! {
-    static ref FLO_API_CALLS: Family::<APICallLabels, Histogram> =
-        Family::new_with_constructor(|| Histogram::new(common_histogram_buckets()));
-}
+static FLO_API_CALLS: LazyLock<Family<APICallLabels, Histogram>> =
+    LazyLock::new(|| Family::new_with_constructor(|| Histogram::new(common_histogram_buckets())));
 
 /// Registers prometheus metrics published by this module.
 pub fn register_metrics(reg: &mut Registry) {
@@ -67,8 +66,7 @@ impl HTTPClient {
 
 #[async_trait]
 impl Client for HTTPClient {
-    async fn get_park(&self, park_id: impl AsRef<str> + Send) -> Result<Park, Error> {
-        let park_id = park_id.as_ref();
+    async fn get_park(&self, park_id: &str) -> Result<Park, Error> {
         report_api_call_timing("get_park", &FLO_API_CALLS, || async {
             let mut req = self
                 .http_client

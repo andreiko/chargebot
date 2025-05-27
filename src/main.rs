@@ -1,27 +1,30 @@
-use std::env::args_os;
-use std::process::exit;
+#![feature(error_generic_member_access)]
+
+use std::{env::args_os, process::exit};
 
 use prometheus_client::registry::Registry;
 use tokio::sync::mpsc;
 
-use crate::config::BotConfig;
-use crate::datasource::Datasource;
-use crate::flo::client::HTTPClient as FLOClient;
-use crate::flo::models::Station;
-use crate::telegram::client::HTTPClient as TelegramClient;
-use crate::telegram::models::Update;
-use crate::telegram::webhook;
-use crate::utils::retry::exp_backoff_forever;
+use crate::{
+    config::BotConfig,
+    datasource::Datasource,
+    flo::{client::HTTPClient as FLOClient, models::Station},
+    telegram::{client::HTTPClient as TelegramClient, models::Update, webhook},
+    utils::retry::exp_backoff_forever,
+};
 
-pub mod bot;
-pub mod config;
-pub mod datasource;
-pub mod flo;
-pub mod metrics;
-pub mod telegram;
-pub mod utils;
+mod bot;
+mod config;
+mod datasource;
+mod flo;
+mod logging;
+mod metrics;
+mod telegram;
+mod utils;
+mod whatever;
 
-// TODO: helm chart
+// TODO: retriable errors
+// TODO: log errors with backtraces
 
 #[tokio::main]
 async fn main() {

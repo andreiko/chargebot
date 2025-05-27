@@ -1,28 +1,32 @@
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::sync::Arc;
-
-use lazy_static::lazy_static;
-use prometheus_client::metrics::counter::Counter;
-use prometheus_client::registry::Registry;
-use tokio::select;
-use tokio::sync::mpsc;
-
-use crate::config::Location;
-use crate::datasource::Datasource;
-use crate::flo::models::{Station, Status};
-use crate::flo::watch::Command;
-use crate::telegram::models::{
-    AnswerCallbackQuery, CallbackQuery, ChatAction, ChatType::Private, EditMessageText,
-    EntityType::BotCommand, InlineKeyboardButton, Message, ReplyMarkup::InlineKeyboard,
-    SendChatAction, SendMessage, Update,
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    sync::{Arc, LazyLock},
 };
-use crate::telegram::output::Payload;
 
-lazy_static! {
-    static ref TELEGRAM_UPDATES: Counter::<u64> = Counter::default();
-    static ref STATION_UPDATES: Counter::<u64> = Counter::default();
-}
+use prometheus_client::{metrics::counter::Counter, registry::Registry};
+use tokio::{select, sync::mpsc};
+
+use crate::{
+    config::Location,
+    datasource::Datasource,
+    flo::{
+        models::{Station, Status},
+        watch::Command,
+    },
+    telegram::{
+        models::{
+            AnswerCallbackQuery, CallbackQuery, ChatAction, ChatType::Private, EditMessageText,
+            EntityType::BotCommand, InlineKeyboardButton, Message, ReplyMarkup::InlineKeyboard,
+            SendChatAction, SendMessage, Update,
+        },
+        output::Payload,
+    },
+    whatever::{SnafuExt, WhateverSync},
+};
+
+static TELEGRAM_UPDATES: LazyLock<Counter<u64>> = LazyLock::new(Counter::default);
+static STATION_UPDATES: LazyLock<Counter<u64>> = LazyLock::new(Counter::default);
 
 /// Registers prometheus metrics published by this module.
 pub fn register_metrics(reg: &mut Registry) {
@@ -104,17 +108,17 @@ async fn dispatch_outputs(
     outputs: Vec<Output>,
     payloads: &mpsc::Sender<Payload>,
     commands: &mpsc::Sender<Command>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), WhateverSync> {
     for out in outputs {
         match out {
             Output::TelegramPayload(request) => payloads
                 .send(request)
                 .await
-                .map_err(|_| "couldn't send telegram request")?,
+                .whatever_msg("couldn't send telegram request")?,
             Output::WatchCommand(command) => commands
                 .send(command)
                 .await
-                .map_err(|_| "couldn't send watch command")?,
+                .whatever_msg("couldn't send watch command")?,
         }
     }
 
@@ -239,7 +243,13 @@ fn process_message(message: &Message, state: &mut State, db: Arc<Datasource>) ->
         && matches!(entity.typ, BotCommand)
         && message.text.len() >= entity.offset + entity.length
     {
-        (message.text[entity.offset..entity.offset + entity.length]).to_lowercase()
+        let s = &message.text[entity.offset..entity.offset + entity.length];
+
+        if s.chars().any(|x| !x.is_lowercase()) {
+            Cow::Owned(s.to_lowercase())
+        } else {
+            Cow::Borrowed(s)
+        }
     } else {
         return vec![];
     };
@@ -395,24 +405,28 @@ impl<T: Into<Payload>> From<T> for Output {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-    use std::ops::AddAssign;
+    use std::{collections::HashSet, ops::AddAssign};
 
-    use tokio::sync::mpsc;
-    use tokio::task::JoinHandle;
-
-    use crate::config;
-    use crate::datasource::Datasource;
-    use crate::flo::models::{Station, Status};
-    use crate::flo::watch::Command;
-    use crate::telegram::models::{
-        AnswerCallbackQuery, CallbackQuery, Chat, ChatAction, ChatType, EditMessageText,
-        EntityType, Message, MessageEntity, ReplyMarkup, SendChatAction, SendMessage, Update, User,
-    };
-    use crate::telegram::output::Payload;
-    use crate::utils::testing::{expect_no_recv, expect_recv};
+    use tokio::{sync::mpsc, task::JoinHandle};
 
     use super::{start, Config};
+    use crate::{
+        config,
+        datasource::Datasource,
+        flo::{
+            models::{Station, Status},
+            watch::Command,
+        },
+        telegram::{
+            models::{
+                AnswerCallbackQuery, CallbackQuery, Chat, ChatAction, ChatType, EditMessageText,
+                EntityType, Message, MessageEntity, ReplyMarkup, SendChatAction, SendMessage,
+                Update, User,
+            },
+            output::Payload,
+        },
+        utils::testing::{expect_no_recv, expect_recv},
+    };
 
     struct Counter<T> {
         next: T,

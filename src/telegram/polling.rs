@@ -1,10 +1,13 @@
-use tokio::select;
-use tokio::sync::{mpsc, Mutex};
+use tokio::{
+    select,
+    sync::{mpsc, Mutex},
+};
 
+use super::{
+    client::Client,
+    models::{GetUpdates, Update},
+};
 use crate::utils::retry::{exp_backoff_forever, retry};
-
-use super::client::Client;
-use super::models::{GetUpdates, Update};
 
 /// Contains configuration options for the Telegram update poller.
 pub struct Config {
@@ -79,12 +82,17 @@ mod tests {
     use serde::Serialize;
     use tokio::sync::mpsc;
 
-    use crate::utils::error::Error;
-    use crate::utils::testing::{expect_no_recv, expect_recv};
-
-    use super::super::client::Client;
-    use super::super::models::{GetUpdates, Payload, Update};
-    use super::{start, Config};
+    use super::{
+        super::{
+            client::Client,
+            models::{GetUpdates, Payload, Update},
+        },
+        start, Config,
+    };
+    use crate::utils::{
+        error::Error,
+        testing::{expect_no_recv, expect_recv},
+    };
 
     struct MockClient {
         confirmed_id: i64,

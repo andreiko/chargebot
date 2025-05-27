@@ -1,18 +1,25 @@
-use std::collections::HashMap;
-use std::error::Error;
-use std::ops::{Deref, RangeInclusive};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    ops::{Deref, RangeInclusive},
+    sync::Arc,
+    time::Duration,
+};
 
 use rand::Rng;
-use tokio::select;
-use tokio::sync::{mpsc, oneshot};
-use tokio::time::sleep;
+use tokio::{
+    select,
+    sync::{mpsc, oneshot},
+    time::sleep,
+};
 
-use crate::utils::retry::{exp_backoff_forever, retry};
-
-use super::client::Client;
-use super::models::{Station, Status};
+use super::{
+    client::Client,
+    models::{Station, Status},
+};
+use crate::{
+    utils::retry::{exp_backoff_forever, retry},
+    whatever::{SnafuExt, WhateverSync},
+};
 
 /// Contains configuration options for the watcher.
 pub struct Config {
@@ -97,7 +104,7 @@ async fn watch_park<C: Client + Sync + Send>(
 
     loop {
         select! {
-            _ = sleep(rand::thread_rng().gen_range(poll_interval.clone())) => {
+            _ = sleep(rand::rng().random_range(poll_interval.clone())) => {
                 if let Err(err) = refresh_park(&id, &mut statuses, client.clone(), output.clone()).await {
                     fail.send(()).await.unwrap();
                     return log::error!("park watcher {} failed: {}", &id, err);
@@ -117,7 +124,7 @@ async fn refresh_park<C: Client>(
     statuses: &mut HashMap<String, Status>,
     client: Arc<C>,
     tx: Arc<mpsc::Sender<Station>>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), WhateverSync> {
     let park = retry(
         &mut exp_backoff_forever(),
         || client.get_park(park_id),
@@ -129,7 +136,8 @@ async fn refresh_park<C: Client>(
             )
         },
     )
-    .await?;
+    .await
+    .whatever()?;
 
     for s in park.stations {
         let should_send = match statuses.get_mut(&s.id) {
@@ -150,7 +158,7 @@ async fn refresh_park<C: Client>(
         if should_send {
             // if send fails here, it means that an unrecoverable error happened in
             // another component and the program is shutting down.
-            tx.send(s).await?;
+            tx.send(s).await.whatever()?;
         }
     }
 
@@ -165,19 +173,26 @@ pub enum Command {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     use async_trait::async_trait;
     use tokio::sync::mpsc;
 
-    use crate::utils::error::Error;
-    use crate::utils::testing::{expect_no_recv, expect_recv};
-
-    use super::super::client::Client;
-    use super::super::models::{Park, Station, Status};
-    use super::{start, Command, Config};
+    use super::{
+        super::{
+            client::Client,
+            models::{Park, Station, Status},
+        },
+        start, Command, Config,
+    };
+    use crate::utils::{
+        error::Error,
+        testing::{expect_no_recv, expect_recv},
+    };
 
     struct MockClient {
         park_map: HashMap<String, Park>,
@@ -185,11 +200,11 @@ mod tests {
 
     #[async_trait]
     impl Client for Arc<Mutex<MockClient>> {
-        async fn get_park(&self, park_id: impl AsRef<str> + Send) -> Result<Park, Error> {
+        async fn get_park(&self, park_id: &str) -> Result<Park, Error> {
             self.lock()
                 .unwrap()
                 .park_map
-                .get(park_id.as_ref())
+                .get(park_id)
                 .map(|p| p.clone())
                 .ok_or(Error::UnexpectedStatus(404))
         }

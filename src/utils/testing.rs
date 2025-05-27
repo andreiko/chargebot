@@ -1,8 +1,6 @@
 use std::time::Duration;
 
-use tokio::select;
-use tokio::sync::mpsc;
-use tokio::time::sleep;
+use tokio::{select, sync::mpsc, time::sleep};
 
 /// ensures the channel receives an item within 100ms and returns the item
 pub async fn expect_recv<T>(rx: &mut mpsc::Receiver<T>) -> Option<T> {

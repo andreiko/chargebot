@@ -1,10 +1,11 @@
 use backoff::backoff::Backoff;
 use tokio::sync::mpsc;
 
+use super::{
+    client::Client,
+    models::{AnswerCallbackQuery, EditMessageText, SendChatAction, SendMessage},
+};
 use crate::utils::retry::retry;
-
-use super::client::Client;
-use super::models::{AnswerCallbackQuery, EditMessageText, SendChatAction, SendMessage};
 
 /// Contains configuration options for the output writer.
 pub struct Config<B: Backoff> {
@@ -86,23 +87,24 @@ pub async fn start<B: Backoff>(client: impl Client, mut cfg: Config<B>) {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-    use std::time::Duration;
+    use std::{sync::Mutex, time::Duration};
 
     use async_trait::async_trait;
     use backoff::backoff::Backoff;
     use serde::Serialize;
     use tokio::sync::mpsc;
 
-    use crate::utils::error::Error;
-    use crate::utils::testing::expect_recv;
-
-    use super::super::client::Client;
-    use super::super::models::{
-        self, AnswerCallbackQuery, ChatAction, EditMessageText, GetUpdates, SendChatAction,
-        SendMessage, Update,
+    use super::{
+        super::{
+            client::Client,
+            models::{
+                self, AnswerCallbackQuery, ChatAction, EditMessageText, GetUpdates, SendChatAction,
+                SendMessage, Update,
+            },
+        },
+        start, Config, Payload,
     };
-    use super::{start, Config, Payload};
+    use crate::utils::{error::Error, testing::expect_recv};
 
     struct MockClient {
         debug_out: mpsc::Sender<Payload>,

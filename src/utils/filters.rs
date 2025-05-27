@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use warp::path::FullPath;
-use warp::{reject, Filter, Rejection};
+use warp::{path::FullPath, reject, Filter, Rejection};
 
 /// Creates a Warp filter that compares full request path to the given string.
 /// Convenient when the path for an endpoint isn't defined in code, but comes from configuration.

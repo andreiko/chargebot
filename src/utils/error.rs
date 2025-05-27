@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-/// Represents standardized error that can happen during an HTTP API call.
+/// Represents a standardized error that can happen during an HTTP API call.
 #[derive(Debug)]
 pub enum Error {
     UnexpectedStatus(u16),

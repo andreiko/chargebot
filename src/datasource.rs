@@ -1,8 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
-use crate::config::{Chat, Location};
+use crate::{
+    config::{Chat, Location},
+    snafu,
+    whatever::WhateverSync,
+};
 
 /// Provides an efficient way to perform lookups on the configuration data.
 pub struct Datasource {
@@ -15,7 +20,7 @@ impl Datasource {
     pub fn new(
         locations: impl IntoIterator<Item = Location>,
         chats: impl IntoIterator<Item = Chat>,
-    ) -> Result<Self, Box<dyn Error>> {
+    ) -> Result<Self, WhateverSync> {
         let mut location_by_id = HashMap::<String, Arc<Location>>::new();
         let mut location_by_station_id = HashMap::<String, Arc<Location>>::new();
         let mut park_ids = HashSet::<String>::new();
@@ -26,12 +31,12 @@ impl Datasource {
                 .insert(location.id.clone(), location.clone())
                 .is_some()
             {
-                return Err(format!("found duplicate location id: {}", &location.id).into());
+                return Err(snafu!("found duplicate location id: {}", &location.id));
             }
 
             for park in &location.parks {
                 if !park_ids.insert(park.id.clone()) {
-                    return Err(format!("found duplicate park id: {}", &park.id).into());
+                    return Err(snafu!("found duplicate park id: {}", &park.id));
                 }
 
                 for station in &park.stations {
@@ -39,7 +44,7 @@ impl Datasource {
                         .insert(station.id.clone(), location.clone())
                         .is_some()
                     {
-                        return Err(format!("found duplicate station id: {}", &park.id).into());
+                        return Err(snafu!("found duplicate station id: {}", &park.id));
                     }
                 }
             }
@@ -53,11 +58,11 @@ impl Datasource {
                 match location_by_id.get(location_id) {
                     Some(loc) => chat_locations.push(loc.clone()),
                     None => {
-                        return Err(format!(
+                        return Err(snafu!(
                             "chat {} references unknown location id: {}",
-                            chat.id, location_id
-                        )
-                        .into())
+                            chat.id,
+                            location_id
+                        ))
                     }
                 }
             }
@@ -66,7 +71,7 @@ impl Datasource {
                 .insert(chat.id, chat_locations)
                 .is_some()
             {
-                return Err(format!("found duplicate chat id: {}", &chat.id).into());
+                return Err(snafu!("found duplicate chat id: {}", &chat.id));
             }
         }
 
@@ -94,9 +99,8 @@ impl Datasource {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{Chat, Location, Park, Station};
-
     use super::Datasource;
+    use crate::config::{Chat, Location, Park, Station};
 
     #[test]
     fn empty() {

@@ -1,16 +1,12 @@
-use std::convert::Infallible;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
-use prometheus_client::encoding::text::encode;
-use prometheus_client::registry::Registry;
+use prometheus_client::{encoding::text::encode, registry::Registry};
 use tokio::sync::mpsc;
-use warp::http::StatusCode;
-use warp::{Filter, Reply};
+use warp::{http::StatusCode, Filter, Reply};
 
 use crate::utils::filters::match_full_path;
 
-/// Contains configuration options for the metrics exporter..
+/// Contains configuration options for the metrics exporter.
 pub struct Config {
     pub reg: Registry,
     pub bind_addr: SocketAddr,
@@ -28,7 +24,7 @@ pub async fn metrics_export_endpoint(reg: Arc<Registry>) -> Result<Box<dyn Reply
 
 /// Starts the metric exporter server.
 ///
-/// It will shut down when `cancel` channel receives a message or gets closed.
+/// It will shut down when the ` cancel ` channel receives a message or gets closed.
 pub async fn start_server(cfg: Config, mut cancel: mpsc::Receiver<()>) {
     log::debug!("starting metrics server");
 

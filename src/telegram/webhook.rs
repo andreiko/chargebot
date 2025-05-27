@@ -1,29 +1,25 @@
-use std::convert::Infallible;
-use std::future::Future;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    convert::Infallible,
+    future::Future,
+    net::SocketAddr,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
-use lazy_static::lazy_static;
-use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
-use prometheus_client::metrics::counter::Counter;
-use prometheus_client::metrics::family::Family;
-use prometheus_client::registry::Registry;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::SendTimeoutError;
-use warp::http::StatusCode;
-use warp::{reject, Filter, Rejection};
-
-use crate::metrics::metrics_export_endpoint;
-use crate::utils::filters::match_full_path;
+use prometheus_client::{
+    encoding::{EncodeLabelSet, EncodeLabelValue},
+    metrics::{counter::Counter, family::Family},
+    registry::Registry,
+};
+use tokio::sync::{mpsc, mpsc::error::SendTimeoutError};
+use warp::{http::StatusCode, reject, Filter, Rejection};
 
 use super::models::Update;
+use crate::{metrics::metrics_export_endpoint, utils::filters::match_full_path};
 
 const AUTH_HEADER: &str = "X-Telegram-Bot-Api-Secret-Token";
 
-lazy_static! {
-    static ref TELEGRAM_WEBHOOKS: Family::<WebhookLabels, Counter> = Family::default();
-}
+static TELEGRAM_WEBHOOKS: LazyLock<Family<WebhookLabels, Counter>> = LazyLock::new(Family::default);
 
 // Prometheus labels struct for `TELEGRAM_WEBHOOKS`.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
@@ -160,13 +156,10 @@ pub fn start(cfg: Config) -> impl Future<Output = ()> {
 mod tests {
     use std::time::Duration;
 
-    use tokio::net::TcpSocket;
-    use tokio::sync::mpsc;
+    use tokio::{net::TcpSocket, sync::mpsc};
 
+    use super::{super::models::Update, start, Config};
     use crate::utils::testing::{expect_no_recv, expect_recv};
-
-    use super::super::models::Update;
-    use super::{start, Config};
 
     #[tokio::test]
     async fn basic() {

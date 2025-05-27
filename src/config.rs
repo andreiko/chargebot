@@ -1,70 +1,69 @@
-use std::error::Error;
-use std::ffi::OsString;
-use std::fs::File;
-use std::io::Read;
-use std::net::SocketAddr;
-use std::ops::RangeInclusive;
-use std::time::Duration;
+use std::{
+    ffi::OsString, fs::File, io::Read, net::SocketAddr, ops::RangeInclusive, time::Duration,
+};
 
-use clap::{App, Arg};
+use clap::{Arg, ArgAction, Command};
 use serde::{Deserialize, Serialize};
 use url::Url;
 use validator::{Validate, ValidationError};
+
+use crate::whatever::{SnafuExt, WhateverSync};
 
 /// Top-level configuration struct.
 #[derive(Deserialize, Validate)]
 pub struct BotConfig {
     /// Specifies locations that can be monitored by the bot.
-    #[validate]
+    #[validate(nested)]
     pub locations: Vec<Location>,
 
     /// Specifies Telegram chats that can be used to interact with the bot.
-    #[validate]
+    #[validate(nested)]
     pub chats: Vec<Chat>,
 
     /// Defines settings related to interactions with Telegram API.
-    #[validate]
+    #[validate(nested)]
     pub telegram: Telegram,
 
     /// Defines settings related to interactions with FLO API.
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub flo: FLO,
 
     /// If specified, metrics server will be listening on a dedicated address.
-    #[validate]
+    #[validate(nested)]
     pub metrics_server: Option<MetricsServer>,
 }
 
 impl BotConfig {
     /// Creates BotConfig from a reader providing YAML.
-    pub fn from_reader(r: impl Read) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let cfg = serde_yaml::from_reader::<_, Self>(r)?;
-        cfg.validate()?;
+    pub fn from_reader(r: impl Read) -> Result<Self, WhateverSync> {
+        let cfg = serde_yaml::from_reader::<_, Self>(r).whatever()?;
+        cfg.validate().whatever()?;
         Ok(cfg)
     }
 
     /// Creates BotConfig command line arguments.
-    pub fn from_cli_args<I, T>(args: I) -> Result<Self, Box<dyn Error + Send + Sync>>
+    pub fn from_cli_args<I, T>(args: I) -> Result<Self, WhateverSync>
     where
         I: IntoIterator<Item = T>,
         T: Into<OsString> + Clone,
     {
-        let app = App::new("chargebot")
+        let app = Command::new("chargebot")
             .arg(
                 Arg::new("config")
+                    .action(ArgAction::Set)
                     .long("config")
                     .short('c')
                     .required(true)
-                    .takes_value(true)
+                    .value_name("FILENAME")
                     .help("path to the yaml config file"),
             )
             .get_matches_from(args);
 
         let filename = app.get_one::<String>("config").unwrap();
 
-        Self::from_reader(File::open(filename)?)
-            .map_err(|e| format!("unable to load config file '{}': {}", filename, e).into())
+        Self::from_reader(File::open(filename).whatever()?)
+            .whatever_msg("unable to load config file")
     }
 }
 
@@ -119,7 +118,7 @@ pub struct Station {
 #[derive(Serialize, Deserialize, Validate)]
 pub struct Chat {
     /// Chat ID in Telegram API.
-    #[validate(custom = "Chat::validate_id")]
+    #[validate(custom(function = "Chat::validate_id"))]
     pub id: i64,
 
     /// List of locations accessible from this chat.
@@ -147,7 +146,7 @@ pub struct Telegram {
     pub api_token: String,
 
     /// Timeout for requests to Telegram API (except for long polling).
-    #[validate(custom = "validate_duration")]
+    #[validate(custom(function = "validate_duration"))]
     #[serde(
         rename = "http_timeout_seconds",
         default = "Telegram::default_http_timeout"
@@ -161,11 +160,11 @@ pub struct Telegram {
     pub output_buffer_size: usize,
 
     /// If specified, the bot will listen for webhooks to receive updates from Telegram API.
-    #[validate]
+    #[validate(nested)]
     pub webhook: Option<Webhook>,
 
     /// If specified, the bot will perform long-polling to receive updates from Telegram API.
-    #[validate]
+    #[validate(nested)]
     pub polling: Option<Polling>,
 
     /// Input buffer for updates to be processed by the bot.
@@ -203,7 +202,7 @@ pub struct Webhook {
     pub secret_token: String,
 
     /// Timeout for adding the received update to the input buffer.
-    #[validate(custom = "validate_duration")]
+    #[validate(custom(function = "validate_duration"))]
     #[serde(
         rename = "accept_timeout_seconds",
         default = "Webhook::default_accept_timeout"
@@ -236,7 +235,7 @@ pub struct Polling {
     pub duration_seconds: u16,
 
     /// Timeout for long polling requests. Must be greater than `duration_seconds`.
-    #[validate(custom = "validate_duration")]
+    #[validate(custom(function = "validate_duration"))]
     #[serde(
         rename = "http_timeout_seconds",
         default = "Polling::default_http_timeout"
@@ -259,19 +258,19 @@ impl Polling {
 #[derive(Serialize, Deserialize, Validate)]
 pub struct FLO {
     /// Timeout for requests to FLO API.
-    #[validate(custom = "validate_duration")]
+    #[validate(custom(function = "validate_duration"))]
     #[serde(rename = "http_timeout_seconds", default = "FLO::default_http_timeout")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub http_timeout: Duration,
 
     /// If specified, the bot will send requests to the specified HTTP origin. Convenient for
     /// using a mocked API server during development.
-    #[validate(custom = "FLO::validate_api_origin")]
+    #[validate(custom(function = "FLO::validate_api_origin"))]
     pub api_origin: Option<String>,
 
     /// Range for random intervals between calls to FLO API.
-    #[validate]
-    #[validate(custom = "FLO::validate_poll_interval")]
+    #[validate(nested)]
+    #[validate(custom(function = "FLO::validate_poll_interval"))]
     #[serde(
         rename = "poll_interval_seconds",
         default = "FLO::default_poll_interval"
@@ -338,10 +337,10 @@ impl FLO {
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Validate)]
 pub struct DurationMinMax {
-    #[validate(custom = "validate_duration")]
+    #[validate(custom(function = "validate_duration"))]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     min: Duration,
-    #[validate(custom = "validate_duration")]
+    #[validate(custom(function = "validate_duration"))]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     max: Duration,
 }

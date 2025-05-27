@@ -1,8 +1,12 @@
 use std::future::Future;
 
-use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
-use prometheus_client::metrics::family::Family;
-use prometheus_client::metrics::histogram::{exponential_buckets, Histogram};
+use prometheus_client::{
+    encoding::{EncodeLabelSet, EncodeLabelValue},
+    metrics::{
+        family::Family,
+        histogram::{exponential_buckets, Histogram},
+    },
+};
 use tokio::time::Instant;
 
 use super::error::Error;

@@ -4,20 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async-trait = "0"
-backoff = "0"
-clap = "3"
-env_logger = "0"
-lazy_static = "1"
-log = "0"
-prometheus-client = "0"
-rand = "0"
-reqwest = { version = "0", features = ["json", "serde_json"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_with = "3"
-serde_yaml = "0"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync"] }
-url = "2"
-validator = { version = "0.16", features = ["derive"] }
+async-trait = "0.1"
+backoff = "0.4"
+clap = "4.5"
+env_logger = "0.11"
+log = "0.4"
+prometheus-client = "0.23"
+rand = "0.9"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = "3.12"
+serde_yaml = "0.9"
+tokio = { version = "1.45", features = ["rt", "rt-multi-thread", "macros", "signal", "sync"] }
+url = "2.5"
+validator = { version = "0.20", features = ["derive"] }
 warp = "0.3"
+snafu = "0.8"
+valuable = { version = "0.1", features = ["derive"] }
+regex = "1.11"

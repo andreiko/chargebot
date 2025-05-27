@@ -1,6 +1,4 @@
-use std::fmt::Display;
-use std::future::Future;
-use std::time::Duration;
+use std::{fmt::Display, future::Future, time::Duration};
 
 use backoff::backoff::Backoff;
 
