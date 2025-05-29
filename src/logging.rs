@@ -1,10 +1,22 @@
 use std::{
+    backtrace::Backtrace,
+    borrow::Borrow,
     fmt::{Display, Formatter, Write},
     sync::LazyLock,
 };
 
 use regex::Regex;
+use snafu::ErrorCompat;
+use tracing_subscriber::{
+    fmt,
+    fmt::{format, time::SystemTime, Layer},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    EnvFilter,
+};
 use valuable::{Valuable, Value, Visit};
+
+use crate::whatever::{SnafuExt, WhateverSync};
 
 static RE_BACKTRACE_FUN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*\d+: (.*)$").unwrap());
 static RE_BACKTRACE_LOC: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*at (.*)$").unwrap());
@@ -17,6 +29,11 @@ pub struct TextBacktrace<'a> {
 pub struct TextFrame<'a> {
     fun: &'a str,
     loc: &'a str,
+}
+
+#[derive(Clone, Copy)]
+enum EventLevel {
+    Error,
 }
 
 impl<'a> TextBacktrace<'a> {
@@ -63,5 +80,70 @@ impl Display for TextBacktrace<'_> {
             f.write_char('\n')?;
         }
         Ok(())
+    }
+}
+
+/// Logs the provided error, its backtrace and causes using the ERROR level.
+pub fn log_error_with_backtrace<E: std::error::Error + ErrorCompat + 'static>(
+    msg: impl Borrow<str>,
+    err: &E,
+) {
+    log_event_with_backtrace(EventLevel::Error, msg, err);
+}
+
+pub fn init_logging() -> Result<(), WhateverSync> {
+    let registry = tracing_subscriber::registry().with(EnvFilter::from_default_env());
+    let format = custom_logging_format();
+    registry
+        .with(format.json().flatten_event(true))
+        .try_init()
+        .whatever()?;
+    Ok(())
+}
+
+/// Configure a custom event formatter
+#[must_use]
+fn custom_logging_format<S>(
+) -> Layer<S, format::DefaultFields, format::Format<format::Compact, SystemTime>>
+where {
+    fmt::layer()
+        .with_level(true)
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
+        .with_ansi(true)
+        .compact()
+}
+
+/// # Panics
+/// Never. See SAFETY comments.
+fn log_event_with_backtrace<E: std::error::Error + ErrorCompat + 'static>(
+    level: EventLevel,
+    msg: impl Borrow<str>,
+    err: &E,
+) {
+    let causes = err.iter_chain().skip(1);
+    let mut bt_out = None::<String>;
+    let bt_parsed = std::error::request_ref::<Backtrace>(err)
+        .map(|bt| TextBacktrace::parse(bt_out.insert(bt.to_string())));
+
+    let cause_msgs = causes.map(ToString::to_string).collect::<Vec<_>>();
+    if let Some(bt) = bt_parsed {
+        match level {
+            EventLevel::Error => {
+                tracing::error!(
+                    backtrace = bt.as_value(),
+                    causes = cause_msgs.as_value(),
+                    "{}: {err}",
+                    msg.borrow()
+                );
+            }
+        };
+    } else {
+        match level {
+            EventLevel::Error => {
+                tracing::error!(causes = cause_msgs.as_value(), "{}: {err}", msg.borrow());
+            }
+        };
     }
 }

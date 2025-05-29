@@ -17,6 +17,7 @@ use super::{
     models::{Station, Status},
 };
 use crate::{
+    logging::log_error_with_backtrace,
     utils::retry::{exp_backoff_forever, retry},
     whatever::{SnafuExt, WhateverSync},
 };
@@ -62,23 +63,24 @@ pub async fn start(client: impl Client + Sync + Send + 'static, cfg: Config) {
 
                         let (done_tx, done_rx) = oneshot::channel::<()>();
                         watchers.insert(park_id.clone(), done_tx);
-                        log::debug!("watcher subscribed to new park {}", &park_id);
+                        tracing::debug!("watcher subscribed to new park {park_id}");
                         tokio::spawn(watch_park(park_id, client.clone(), output.clone(),
                             cfg.poll_interval.clone(), done_rx, fail_tx.clone()));
                     }
                     Command::UnsubscribeFromPark(park_id) => {
-                        log::debug!("watcher unsubscribed from park {}", &park_id);
+                        tracing::debug!("watcher unsubscribed from park {park_id}");
                         watchers.remove(&park_id);
                     }
                 }
             }
             _ = fail_rx.recv() => {
-                return log::error!("watch manager failed due to previous park watcher failure");
+                tracing::error!("watch manager failed due to previous park watcher failure");
+                return;
             }
         }
     }
 
-    log::debug!("watch manager finished");
+    tracing::debug!("watch manager finished");
 }
 
 /// Starts a task that watches a Park with the specified `id` and sends updates to the `output` channel.
@@ -94,12 +96,13 @@ async fn watch_park<C: Client + Sync + Send>(
     mut done: oneshot::Receiver<()>,
     fail: Arc<mpsc::Sender<()>>,
 ) {
-    log::debug!("starting park watcher {}", &id);
+    tracing::debug!("starting park watcher {id}");
     let mut statuses = HashMap::<String, Status>::new();
 
     if let Err(err) = refresh_park(&id, &mut statuses, client.clone(), output.clone()).await {
         fail.send(()).await.unwrap();
-        return log::error!("park watcher {} failed: {}", &id, err);
+        log_error_with_backtrace(format!("park watcher {id} failed"), &err);
+        return;
     }
 
     loop {
@@ -107,14 +110,15 @@ async fn watch_park<C: Client + Sync + Send>(
             _ = sleep(rand::rng().random_range(poll_interval.clone())) => {
                 if let Err(err) = refresh_park(&id, &mut statuses, client.clone(), output.clone()).await {
                     fail.send(()).await.unwrap();
-                    return log::error!("park watcher {} failed: {}", &id, err);
+                    log_error_with_backtrace(format!("park watcher {id} failed"), &err);
+                    return;
                 }
             }
             _ = &mut done => break
         }
     }
 
-    log::debug!("park watcher {} finished", &id);
+    tracing::debug!("park watcher {id} finished");
 }
 
 /// Attempts to fetch status of a park with the specified ID and send updates for statuses that
@@ -128,12 +132,7 @@ async fn refresh_park<C: Client>(
     let park = retry(
         exp_backoff_forever,
         || client.get_park(park_id),
-        |e| {
-            log::error!(
-                "transient error while fetching park (will be retried): {}",
-                e
-            )
-        },
+        |e| log_error_with_backtrace("transient error while fetching park (will be retried)", &e),
     )
     .await
     .whatever()?;

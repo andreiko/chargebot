@@ -7,7 +7,10 @@ use super::{
     client::Client,
     models::{GetUpdates, Update},
 };
-use crate::utils::retry::{exp_backoff_forever, retry};
+use crate::{
+    logging::log_error_with_backtrace,
+    utils::retry::{exp_backoff_forever, retry},
+};
 
 /// Contains configuration options for the Telegram update poller.
 pub struct Config {
@@ -43,9 +46,9 @@ pub async fn start(client: impl Client, cfg: Config) {
                 }
             },
             |e| {
-                log::error!(
-                    "transient error while polling updates (will be retried): {}",
-                    e
+                log_error_with_backtrace(
+                    "transient error while polling updates (will be retried)}",
+                    &e,
                 )
             },
         )
@@ -57,7 +60,7 @@ pub async fn start(client: impl Client, cfg: Config) {
                 None => return, // stop polling if got cancelled during the attempt
             },
             Err(err) => {
-                return log::error!("polling manager failed to get updates: {}", err);
+                return tracing::error!("polling manager failed to get updates: {err}",);
             }
         };
 
@@ -67,7 +70,7 @@ pub async fn start(client: impl Client, cfg: Config) {
             }
 
             if let Err(err) = cfg.output.send(update).await {
-                return log::error!("polling manager failed to send update: {}", err);
+                return tracing::error!("polling manager failed to send update: {err}");
             }
         }
     }

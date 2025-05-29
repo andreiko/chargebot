@@ -9,6 +9,7 @@ use crate::{
     config::BotConfig,
     datasource::Datasource,
     flo::{client::HTTPClient as FLOClient, models::Station},
+    logging::{init_logging, log_error_with_backtrace},
     telegram::{client::HTTPClient as TelegramClient, models::Update, webhook},
     utils::retry::exp_backoff_forever,
 };
@@ -23,13 +24,9 @@ mod telegram;
 mod utils;
 mod whatever;
 
-// TODO: retriable errors
-// TODO: log errors with backtraces
-
 #[tokio::main]
 async fn main() {
-    // init logging
-    env_logger::init();
+    init_logging().expect("initializing logging");
 
     // init metrics
     let mut prom_registry = Registry::with_prefix("chargebot");
@@ -42,7 +39,7 @@ async fn main() {
     let bot_cfg = match BotConfig::from_cli_args(args_os()) {
         Ok(cfg) => cfg,
         Err(err) => {
-            log::error!("unable to load configuration: {}", err);
+            log_error_with_backtrace("unable to load configuration", &err);
             exit(2);
         }
     };
@@ -148,7 +145,7 @@ async fn main() {
     // start webhook server or update poller
     match (bot_cfg.telegram.webhook, bot_cfg.telegram.polling) {
         (Some(webhook), None) => {
-            log::debug!("starting webhook server");
+            tracing::debug!("starting webhook server");
             webhook::start(webhook::Config {
                 path: webhook.path,
                 secret_token: webhook.secret_token,
@@ -159,11 +156,11 @@ async fn main() {
                 metrics: webhook_metrics_config,
             })
             .await;
-            log::debug!("webhook server finished");
+            tracing::debug!("webhook server finished");
         }
         (None, Some(polling)) => {
             use crate::telegram::polling;
-            log::debug!("starting polling manager");
+            tracing::debug!("starting polling manager");
             let telegram_client =
                 TelegramClient::new(bot_cfg.telegram.api_token, polling.http_timeout);
             polling::start(
@@ -175,7 +172,7 @@ async fn main() {
                 },
             )
             .await;
-            log::debug!("polling manager finished")
+            tracing::debug!("polling manager finished")
         }
         (_, _) => {
             panic!("configuration error: either webhook or polling must be specified");
@@ -191,5 +188,5 @@ async fn main() {
         join_handle.await.unwrap();
     }
 
-    log::debug!("all tasks finished");
+    tracing::debug!("all tasks finished");
 }

@@ -97,11 +97,11 @@ pub async fn start(mut cfg: Config) {
             // if dispatch fails here, it means that an unrecoverable error happened in
             // a downstream component and the program is shutting down
             cfg.fail.send(()).await.unwrap();
-            return log::error!("processor failed: {}", err);
+            return tracing::error!("processor failed: {err}");
         }
     }
 
-    log::debug!("processor finished");
+    tracing::debug!("processor finished");
 }
 
 async fn dispatch_outputs(

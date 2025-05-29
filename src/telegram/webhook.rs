@@ -115,7 +115,7 @@ pub fn start(cfg: Config) -> impl Future<Output = ()> {
                                     outcome: WebhookOutcome::Timeout,
                                 })
                                 .inc();
-                            log::error!("update rejected due to full channel");
+                            tracing::error!("update rejected due to full channel");
                             Ok(StatusCode::SERVICE_UNAVAILABLE)
                         }
                         SendTimeoutError::Closed(_) => {
@@ -124,7 +124,7 @@ pub fn start(cfg: Config) -> impl Future<Output = ()> {
                                     outcome: WebhookOutcome::ChannelClosed,
                                 })
                                 .inc();
-                            log::error!("update rejected due to closed channel");
+                            tracing::error!("update rejected due to closed channel");
                             Ok(StatusCode::INTERNAL_SERVER_ERROR)
                         }
                     };

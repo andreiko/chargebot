@@ -79,7 +79,7 @@ impl Client for HTTPClient {
             Error::expect_status_code(200, &resp)?;
 
             let park = resp.json().await?;
-            log::debug!("pulled latest park info for {}", park_id);
+            tracing::debug!("pulled latest park info for {park_id}");
             Ok(park)
         })
         .await

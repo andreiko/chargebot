@@ -1,11 +1,11 @@
-use backoff::{ExponentialBackoff};
+use backoff::ExponentialBackoff;
 use tokio::sync::mpsc;
 
 use super::{
     client::Client,
     models::{AnswerCallbackQuery, EditMessageText, SendChatAction, SendMessage},
 };
-use crate::utils::retry::{retry};
+use crate::{logging::log_error_with_backtrace, utils::retry::retry};
 
 /// Contains configuration options for the output writer.
 pub struct Config<B: Fn() -> ExponentialBackoff> {
@@ -67,9 +67,9 @@ pub async fn start<B: Fn() -> ExponentialBackoff>(client: impl Client, cfg: Conf
                 }
             },
             |e| {
-                log::error!(
-                    "transient error while calling Telegram API (will be retried): {}",
-                    e
+                log_error_with_backtrace(
+                    "transient error while calling Telegram API (will be retried)",
+                    &e,
                 )
             },
         )
@@ -77,11 +77,11 @@ pub async fn start<B: Fn() -> ExponentialBackoff>(client: impl Client, cfg: Conf
 
         if let Err(err) = result {
             cfg.fail.send(()).await.unwrap();
-            return log::error!("output queue failed: {}", err);
+            return tracing::error!("output queue failed: {err}");
         }
     }
 
-    log::debug!("output writer finished");
+    tracing::debug!("output writer finished");
 }
 
 #[cfg(test)]

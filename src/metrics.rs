@@ -26,7 +26,7 @@ pub async fn metrics_export_endpoint(reg: Arc<Registry>) -> Result<Box<dyn Reply
 ///
 /// It will shut down when the ` cancel ` channel receives a message or gets closed.
 pub async fn start_server(cfg: Config, mut cancel: mpsc::Receiver<()>) {
-    log::debug!("starting metrics server");
+    tracing::debug!("starting metrics server");
 
     let reg = Arc::new(cfg.reg);
     let routes = match_full_path(cfg.path)
@@ -43,5 +43,5 @@ pub async fn start_server(cfg: Config, mut cancel: mpsc::Receiver<()>) {
         .1
         .await;
 
-    log::debug!("metrics server finished");
+    tracing::debug!("metrics server finished");
 }
