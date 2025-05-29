@@ -1,47 +1,23 @@
-use std::fmt::{Display, Formatter};
+use std::backtrace::Backtrace;
+use snafu::Snafu;
+
+use crate::utils::retry::MaybeRetriable;
 
 /// Represents a standardized error that can happen during an HTTP API call.
-#[derive(Debug)]
+#[derive(Debug, Snafu)]
 pub enum Error {
-    UnexpectedStatus(u16),
-    ReqwestError(reqwest::Error),
-    InvalidContents(String),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::UnexpectedStatus(code) => {
-                f.write_fmt(format_args!("unexpected response status: {}", code))
-            }
-            Error::ReqwestError(err) => Display::fmt(err, f),
-            Error::InvalidContents(msg) => f.write_str(msg),
-        }
-    }
+    #[snafu(display("unexpected response status: {code}"))]
+    UnexpectedStatus { code: u16 },
+    #[snafu(transparent, context(false))]
+    ReqwestError {
+        source: reqwest::Error,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("{msg}"))]
+    InvalidContents { msg: String },
 }
 
 impl Error {
-    /// Returns whether the error is indicated by a server error status code.
-    pub fn is_server(&self) -> bool {
-        if let Error::UnexpectedStatus(code) = self {
-            *code >= 500 && *code < 600
-        } else {
-            false
-        }
-    }
-
-    /// Returns whether the call failed at the transport level.
-    pub fn is_transport(&self) -> bool {
-        if let Error::ReqwestError(err) = self {
-            err.is_connect()
-                || err.is_timeout()
-                || err.is_request()
-                || (err.is_body() && !err.is_decode())
-        } else {
-            false
-        }
-    }
-
     /// Returns an error if the status code in the provided response differs from the provided expected code.
     pub fn expect_status_code(
         expected_code: u16,
@@ -49,17 +25,31 @@ impl Error {
     ) -> Result<(), Self> {
         let code = response.status().as_u16();
         if code != expected_code {
-            Err(Error::UnexpectedStatus(code))
+            Err(Error::UnexpectedStatus { code })
         } else {
             Ok(())
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl MaybeRetriable for Error {
+    fn is_retriable(&self) -> bool {
+        match self {
+            Error::UnexpectedStatus { code } => *code >= 500 && *code < 600,
+            Error::ReqwestError { source, .. } => source.is_retriable(),
+            Error::InvalidContents { .. } => false,
+        }
+    }
+}
 
-impl From<reqwest::Error> for Error {
-    fn from(err: reqwest::Error) -> Self {
-        Error::ReqwestError(err)
+impl MaybeRetriable for reqwest::Error {
+    fn is_retriable(&self) -> bool {
+        self.is_connect()
+            || self.is_timeout()
+            || self.is_request()
+            || (self.is_body() && !self.is_decode())
+            || (self
+                .status()
+                .is_some_and(|s| s.as_u16() >= 500 && s.as_u16() < 600))
     }
 }

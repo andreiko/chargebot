@@ -1,43 +1,54 @@
-use std::{fmt::Display, future::Future, time::Duration};
+use std::{future::Future, time::Duration};
 
-use backoff::backoff::Backoff;
+use backoff::{backoff::Backoff, ExponentialBackoff, ExponentialBackoffBuilder};
+use tokio::time::sleep;
+
+pub trait MaybeRetriable {
+    fn is_retriable(&self) -> bool;
+}
 
 /// Returns retry backoff profile commonly used in this app.
 /// Attempts will be happening indefinitely, with exponentially increasing intervals up to 10 seconds.
-pub fn exp_backoff_forever() -> impl Backoff {
-    backoff::ExponentialBackoffBuilder::default()
+#[must_use]
+pub fn exp_backoff_forever() -> ExponentialBackoff {
+    const INITIAL_INTERVAL: Duration = Duration::from_millis(500);
+    const MAX_INTERVAL: Duration = Duration::from_secs(10);
+    ExponentialBackoffBuilder::default()
+        .with_initial_interval(INITIAL_INTERVAL)
+        .with_max_interval(MAX_INTERVAL)
         .with_max_elapsed_time(None)
-        .with_max_interval(Duration::from_secs(10))
         .build()
 }
 
-/// Retries asynchronous function `f` using backoff profile `b`. Calls `test_fn` to determine
-/// whether the error should be retried. If the error should not be retried, it's returned back
-/// to the caller. Otherwise `log_fn` is called to let the client log the intermittent error.
-pub async fn retry<B, T, E, F, FUT, TF, LF>(
-    b: &mut B,
-    f: F,
-    test_fn: TF,
-    log_fn: LF,
-) -> Result<T, E>
+/// Executes `f()` and propagates its successful return value.
+/// Retries errors that are considered retriable by `MaybeRetriable` trait.
+/// Calls `log_fn()` after each retriable error.
+///
+/// # Errors
+/// If `f()` returns a non-retriable error.
+/// Backoff manager returned by `backoff_fn()` runs out of attempts/time.
+pub async fn retry<BF, F, LF, T, E, FUT>(backoff_fn: BF, f: F, log_fn: LF) -> Result<T, E>
 where
-    B: Backoff,
-    E: Display,
+    BF: Fn() -> ExponentialBackoff + Copy,
     F: Fn() -> FUT,
+    LF: Fn(E),
     FUT: Future<Output = Result<T, E>>,
-    TF: Fn(&E) -> bool,
-    LF: Fn(&E),
+    E: MaybeRetriable,
 {
+    let mut backoff = None::<ExponentialBackoff>;
     loop {
         match f().await {
-            Ok(res) => break Ok(res),
-            Err(err) => match (test_fn(&err), b.next_backoff()) {
-                (true, Some(delay)) => {
-                    log_fn(&err);
-                    tokio::time::sleep(delay).await;
+            Ok(val) => break Ok(val),
+            Err(err) => {
+                let b = backoff.get_or_insert_with(backoff_fn);
+                match (err.is_retriable(), b.next_backoff()) {
+                    (true, Some(delay)) => {
+                        log_fn(err);
+                        sleep(delay).await;
+                    }
+                    _ => return Err(err),
                 }
-                _ => return Err(err),
-            },
+            }
         }
     }
 }

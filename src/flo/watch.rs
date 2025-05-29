@@ -126,9 +126,8 @@ async fn refresh_park<C: Client>(
     tx: Arc<mpsc::Sender<Station>>,
 ) -> Result<(), WhateverSync> {
     let park = retry(
-        &mut exp_backoff_forever(),
+        exp_backoff_forever,
         || client.get_park(park_id),
-        |e| e.is_server() || e.is_transport(),
         |e| {
             log::error!(
                 "transient error while fetching park (will be retried): {}",
@@ -206,7 +205,7 @@ mod tests {
                 .park_map
                 .get(park_id)
                 .map(|p| p.clone())
-                .ok_or(Error::UnexpectedStatus(404))
+                .ok_or(Error::UnexpectedStatus { code: 404 })
         }
     }
 

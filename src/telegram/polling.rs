@@ -28,7 +28,7 @@ pub async fn start(client: impl Client, cfg: Config) {
 
     loop {
         let updates_res = retry(
-            &mut exp_backoff_forever(),
+            exp_backoff_forever,
             || async {
                 let get_updates_fut = client.get_updates(GetUpdates {
                     offset: next_offset as i64,
@@ -42,7 +42,6 @@ pub async fn start(client: impl Client, cfg: Config) {
                     _ = cancel.recv() => Ok(None),
                 }
             },
-            |e| e.is_server() || e.is_transport(),
             |e| {
                 log::error!(
                     "transient error while polling updates (will be retried): {}",

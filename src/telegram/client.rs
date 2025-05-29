@@ -89,9 +89,9 @@ impl Client for HTTPClient {
 
             let envelope = resp.json::<ResponseEnvelope<Vec<Update>>>().await?;
             if !envelope.ok {
-                return Err(Error::InvalidContents(
-                    "ok=false in API response".to_string(),
-                ));
+                return Err(Error::InvalidContents {
+                    msg: "ok=false in API response".into(),
+                });
             }
 
             Ok(envelope.result)

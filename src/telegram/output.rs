@@ -1,14 +1,14 @@
-use backoff::backoff::Backoff;
+use backoff::{ExponentialBackoff};
 use tokio::sync::mpsc;
 
 use super::{
     client::Client,
     models::{AnswerCallbackQuery, EditMessageText, SendChatAction, SendMessage},
 };
-use crate::utils::retry::retry;
+use crate::utils::retry::{retry};
 
 /// Contains configuration options for the output writer.
-pub struct Config<B: Backoff> {
+pub struct Config<B: Fn() -> ExponentialBackoff> {
     pub input: mpsc::Receiver<Payload>,
     pub fail: mpsc::Sender<()>,
     pub backoff: B,
@@ -53,11 +53,11 @@ impl From<AnswerCallbackQuery> for Payload {
 ///
 /// The writer will shut down when the `input` channel is closed or when it encounters
 /// an unrecoverable error. In the latter case, it will also send () to the `fail` channel.
-pub async fn start<B: Backoff>(client: impl Client, mut cfg: Config<B>) {
+pub async fn start<B: Fn() -> ExponentialBackoff>(client: impl Client, cfg: Config<B>) {
     let mut input = cfg.input;
     while let Some(req) = input.recv().await {
         let result = retry(
-            &mut cfg.backoff,
+            &cfg.backoff,
             || async {
                 match &req {
                     Payload::SendMessage(payload) => client.deliver_payload(payload).await,
@@ -66,7 +66,6 @@ pub async fn start<B: Backoff>(client: impl Client, mut cfg: Config<B>) {
                     Payload::AnswerCallbackQuery(payload) => client.deliver_payload(payload).await,
                 }
             },
-            |e| e.is_transport() || e.is_server(),
             |e| {
                 log::error!(
                     "transient error while calling Telegram API (will be retried): {}",
@@ -90,7 +89,7 @@ mod tests {
     use std::{sync::Mutex, time::Duration};
 
     use async_trait::async_trait;
-    use backoff::backoff::Backoff;
+    use backoff::{backoff::Backoff, ExponentialBackoff};
     use serde::Serialize;
     use tokio::sync::mpsc;
 
@@ -158,7 +157,7 @@ mod tests {
         }
     }
 
-    fn shorter_backoff() -> impl Backoff {
+    fn shorter_backoff() -> ExponentialBackoff {
         backoff::ExponentialBackoffBuilder::default()
             .with_initial_interval(Duration::from_millis(5))
             .build()
@@ -176,7 +175,7 @@ mod tests {
             telegram_client,
             Config {
                 input: payloads_rx,
-                backoff: shorter_backoff(),
+                backoff: shorter_backoff,
                 fail: fail_tx,
             },
         ));
@@ -202,14 +201,15 @@ mod tests {
         let (payloads_tx, payloads_rx) = mpsc::channel::<Payload>(10);
         let (debug_tx, _) = mpsc::channel::<Payload>(10);
         let (fail_tx, mut fail_rx) = mpsc::channel::<()>(1);
-        let telegram_client = MockClient::new(debug_tx, Some(Error::UnexpectedStatus(400)));
+        let telegram_client =
+            MockClient::new(debug_tx, Some(Error::UnexpectedStatus { code: 400 }));
 
         // start the output queue processor
         let handle = tokio::spawn(start(
             telegram_client,
             Config {
                 input: payloads_rx,
-                backoff: shorter_backoff(),
+                backoff: shorter_backoff,
                 fail: fail_tx,
             },
         ));
@@ -230,13 +230,14 @@ mod tests {
         let (payloads_tx, payloads_rx) = mpsc::channel::<Payload>(10);
         let (debug_tx, mut debug_rx) = mpsc::channel::<Payload>(10);
         let (fail_tx, _) = mpsc::channel::<()>(1);
-        let telegram_client = MockClient::new(debug_tx, Some(Error::UnexpectedStatus(503)));
+        let telegram_client =
+            MockClient::new(debug_tx, Some(Error::UnexpectedStatus { code: 503 }));
 
         let handle = tokio::spawn(start(
             telegram_client,
             Config {
                 input: payloads_rx,
-                backoff: shorter_backoff(),
+                backoff: shorter_backoff,
                 fail: fail_tx,
             },
         ));

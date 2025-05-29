@@ -90,7 +90,7 @@ async fn main() {
         telegram::output::Config {
             input: payloads_rx,
             fail: cancel_tx.clone(),
-            backoff: exp_backoff_forever(),
+            backoff: exp_backoff_forever,
         },
     ));
 

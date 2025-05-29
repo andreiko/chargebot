@@ -53,8 +53,8 @@ pub async fn report_api_call_timing<R, F: Future<Output = Result<R, Error>>>(
             let labels = APICallLabels {
                 endpoint,
                 status_code: match &err {
-                    Error::InvalidContents(_) => 200,
-                    Error::UnexpectedStatus(code) => *code,
+                    Error::InvalidContents { .. } => 200,
+                    Error::UnexpectedStatus { code } => *code,
                     _ => 0,
                 },
                 outcome: APICallOutcome::Failure,
